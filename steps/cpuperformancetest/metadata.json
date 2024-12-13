@@ -1,0 +1,12 @@
+{
+    "actionOnStepFail": "continue", 
+    "enabled": true, 
+    "externalUuid4": "c7242e3e-c790-40ba-9b39-c96432019bc5", 
+    "interpreter": 1, 
+    "key": "cpuperformancetest", 
+    "name": "CPU Performance Test", 
+    "osCredKey": "linususerroot", 
+    "serverKey": "linuxnode", 
+    "successExitCode": 0, 
+    "type": "com.servertribe.attune.tuples.StepSshTuple"
+}

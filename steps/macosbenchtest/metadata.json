@@ -1,0 +1,15 @@
+{
+    "actionOnStepFail": "stop", 
+    "concurrency": 1, 
+    "enabled": true, 
+    "externalUuid4": "c81e2701-9ad7-4139-b812-2d8dc5fa8d23", 
+    "isBlueprint": true, 
+    "key": "macosbenchtest", 
+    "links": [
+        {
+            "stepKey": "cpuperformancetest"
+        }
+    ], 
+    "name": "macOS Bench Test", 
+    "type": "com.servertribe.attune.tuples.StepGroupTuple"
+}

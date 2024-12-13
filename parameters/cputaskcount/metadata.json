@@ -1,0 +1,7 @@
+{
+    "externalUuid4": "ca4bce04-b169-4d9e-9ad3-2855e13fdc9c", 
+    "key": "cputaskcount", 
+    "name": "CPU Task Count", 
+    "showInPlan": true, 
+    "type": "c.s.s.b.phv.Text"
+}
