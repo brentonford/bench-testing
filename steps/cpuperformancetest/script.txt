@@ -1,6 +1,54 @@
+#!/bin/bash
+
+# Number of tasks to complete for the CPU test
 CPU_TASK_COUNT={cpuTaskCount}
 declare -a CPU_TEMPS
 declare -a FAN_SPEEDS
+declare -a FREQ_MHZS
+
+#####
+# Function to extract CPU temperature, fan speed, and frequency
+#####
+collect_metrics() {
+  local metrics
+  metrics=$(powermetrics -n 1 --samplers cpu_power,smc | grep -Ei "CPU die temperature|fan|System Average frequency")
+
+  # Regex patterns
+  local freqPerRegex='s/.*: ([0-9.]+)%.*\(([^ ]+).*/\1/'
+  local freqMhzRegex='s/.*\(([^ ]+).*/\1/'
+  
+  # Extract Frequency Percentage
+  local freqPer=$(echo "$metrics" | grep -i "System Average frequency" | sed -E "$freqPerRegex" | head -n 1)
+  
+  # Extract Frequency in MHz
+  local freqMhz=$(echo "$metrics" | grep -i "System Average frequency" | sed -E "$freqMhzRegex" | head -n 1)
+  
+  # Extract CPU Temperature
+  local temp=$(echo "$metrics" | grep -i "CPU die temperature" | sed -E 's/[^0-9.]//g' | head -n 1)
+  
+  # Extract Fan Speed
+  local fan=$(echo "$metrics" | grep -i "fan" | sed -E 's/[^0-9.]//g' | head -n 1)
+
+  # Return metrics as a space-separated string
+  echo "$freqPer $freqMhz $temp $fan"
+}
+
+#####
+# Function to run CPU-intensive tasks
+#####
+run_cpu_stress() {
+  local end_time=$((SECONDS + 10)) # Set the end time for 10 seconds
+  while [[ SECONDS -lt $end_time ]]; do
+    for ((c = 1; c <= CPU_CORES; c++)); do
+      echo "scale=5000; 4*a(1)" | bc -lq > /dev/null &
+    done
+    wait # Ensure background tasks complete before starting the next batch
+  done
+}
+
+echo "Pre-test metrics:"
+pre_test_metrics=$(powermetrics -n 1 --samplers cpu_power,smc | grep -Ei "CPU die temperature|fan|System Average frequency")
+echo "$pre_test_metrics"
 
 # Get the number of CPU cores
 CPU_CORES=$(sysctl -n hw.ncpu)
@@ -12,50 +60,28 @@ echo "Starting CPU performance test..."
 START_TIME=$(date +%s)
 
 #####
-# Function to extract CPU temperature and fan speed
-#####
-collect_metrics() {
-  local metrics
-  metrics=$(powermetrics -n 1 --samplers cpu_power,smc | grep -Ei "CPU die temperature|fan|System Average frequency")
-
-  local freqPerRegex='s/.*: ([0-9.]+)%.*\(([^ ]+).*/\1/'
-  local freqMhzRegex='s/.*\(([^ ]+).*/\1/'
-
-  # Extract Freq %
-  local freqPer=$(echo "$metrics" | grep -i "System Average frequency" | sed -E "$freqPerRegex" | head -n 1)
-
-  # Extract Freq Mhz
-  local freqMhz=$(echo "$metrics" | grep -i "System Average frequency" | sed -E "$freqMhzRegex" | head -n 1)
-
-  # Extract CPU temperature
-  local temp=$(echo "$metrics" | grep -i "CPU die temperature" | sed -E 's/[^0-9.]//g' | head -n 1)
-  # Extract fan speed
-  local fan=$(echo "$metrics" | grep -i "fan" | sed -E 's/[^0-9.]//g' | head -n 1)
-  
-  # Return as a space-separated string
-  echo "$freqPer $freqMhz $temp $fan"
-}
-
-####
 # Perform CPU-intensive tasks
-####
+#####
 for ((i = 1; i <= CPU_TASK_COUNT; i++)); do
   echo "Task count: $i"
 
-  # Launch CPU-intensive background tasks based on the number of cores
-  for ((c = 1; c <= CPU_CORES; c++)); do
-    echo "scale=5000; 4*a(1)" | bc -lq > /dev/null &
-  done
-  
+  # Run CPU-intensive tasks in the background
+  run_cpu_stress &
+
   # Collect metrics
   metrics=$(collect_metrics)
+
+  # Wait for tasks to complete
+  wait
+
+  # Parse metrics
   FREQ_PER=$(echo "$metrics" | awk '{print $1}' | tr -d '\n')
   FREQ_MHZ=$(echo "$metrics" | awk '{print $2}' | tr -d '\n')
   CPU_TEMP=$(echo "$metrics" | awk '{print $3}' | tr -d '\n')
   FAN_SPEED=$(echo "$metrics" | awk '{print $4}' | tr -d '\n')
-  
-  echo "System Average frequency: ${FREQ_PER} %"
-  echo "System Average frequency: ${FREQ_MHZ} Mhz"
+
+  echo "System Average Frequency: ${FREQ_PER} %"
+  echo "System Average Frequency: ${FREQ_MHZ} MHz"
   echo "CPU Temperature: ${CPU_TEMP} C"
   echo "Fan Speed: ${FAN_SPEED} RPM"
 
@@ -63,17 +89,14 @@ for ((i = 1; i <= CPU_TASK_COUNT; i++)); do
   FREQ_MHZS+=("$FREQ_MHZ")
   CPU_TEMPS+=("$CPU_TEMP")
   FAN_SPEEDS+=("$FAN_SPEED")
-
-  # Wait for all background tasks to complete before starting the next round
-  wait
 done
 
-####
-# Sumarise the results
-####
-# Find the max and mins
+#####
+# Summarize the results
+#####
+# Find max and min values
 freq_max=$(printf "%s\n" "${FREQ_MHZS[@]}" | sort -nr | head -n 1)
-freq_min=$(printf "%s\n" "${FREQ_MHZS[@]}" | sort -nr | tail -n 1)
+freq_min=$(printf "%s\n" "${FREQ_MHZS[@]}" | sort -n | head -n 1)
 temp_max=$(printf "%s\n" "${CPU_TEMPS[@]}" | sort -nr | head -n 1)
 fan_max=$(printf "%s\n" "${FAN_SPEEDS[@]}" | sort -nr | head -n 1)
 
@@ -89,20 +112,27 @@ for fan in "${FAN_SPEEDS[@]}"; do
 done
 
 temp_avg=$(echo "scale=2; $temp_sum / ${#CPU_TEMPS[@]}" | bc -l)
-fan_avg=$(echo "scale=2; $fan_sum / ${#FAN_SPEEDS[@]}" | bc -l)
 
 # Output the results
 echo "==========================================="
-echo "The maximum CPU Frequency is: $freq_max Mhz"
-echo "The minimum CPU Frequency is: $freq_min Mhz"
+echo "Pre-test metrics: "
+echo "${pre_test_metrics}"
+echo "==========================================="
+echo "Test metrics: "
+echo "The starting CPU Frequency is: ${FREQ_MHZS[0]} MHz"
+echo "The maximum CPU Frequency is: $freq_max MHz"
+echo "The minimum CPU Frequency is: $freq_min MHz"
 echo "The maximum CPU Temperature is: $temp_max C"
 echo "The average CPU Temperature is: $temp_avg C"
 echo "The maximum Fan Speed is: $fan_max RPM"
-echo "The average Fan Speed is: $fan_avg RPM"
 
 # Record the end time
 END_TIME=$(date +%s)
 
 # Calculate and display elapsed time
 ELAPSED_TIME=$((END_TIME - START_TIME))
-echo "CPU performance test completed in $ELAPSED_TIME seconds."
+minutes=$((ELAPSED_TIME / 60))
+seconds=$((ELAPSED_TIME % 60))
+
+# Display the result
+echo "CPU performance test completed in $minutes minutes and $seconds seconds."
