@@ -37,13 +37,12 @@ collect_metrics() {
 # Function to run CPU-intensive tasks
 #####
 run_cpu_stress() {
-  local end_time=$((SECONDS + 10)) # Set the end time for 10 seconds
-  while [[ SECONDS -lt $end_time ]]; do
-    for ((c = 1; c <= CPU_CORES; c++)); do
-      echo "scale=5000; 4*a(1)" | bc -lq > /dev/null &
-    done
-    wait # Ensure background tasks complete before starting the next batch
+  for ((c = 1; c <= CPU_CORES; c++)); do
+    echo "scale=10000; 4*a(1)" | bc -lq > /dev/null &
+    # scale sets the precision of decimal places for calculations.
+    # 4*a(1) is a mathematical expression that calculates pi using the arctangent function
   done
+  wait # Ensure background tasks complete before starting the next batch
 }
 
 echo "Pre-test metrics:"
