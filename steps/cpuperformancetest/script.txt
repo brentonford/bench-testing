@@ -101,13 +101,9 @@ fan_max=$(printf "%s\n" "${FAN_SPEEDS[@]}" | sort -nr | head -n 1)
 
 # Calculate average temperature and fan speed
 temp_sum=0
-fan_sum=0
 
 for temp in "${CPU_TEMPS[@]}"; do
   temp_sum=$(echo "$temp_sum + $temp" | bc)
-done
-for fan in "${FAN_SPEEDS[@]}"; do
-  fan_sum=$(echo "$fan_sum + $fan" | bc)
 done
 
 temp_avg=$(echo "scale=2; $temp_sum / ${#CPU_TEMPS[@]}" | bc -l)
