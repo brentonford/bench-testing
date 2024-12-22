@@ -62,7 +62,7 @@ START_TIME=$(date +%s)
 # Perform CPU-intensive tasks
 #####
 for ((i = 1; i <= CPU_TASK_COUNT; i++)); do
-  echo "Task count: $i"
+  echo "Task count: $i of $CPU_TASK_COUNT"
 
   # Run CPU-intensive tasks in the background
   run_cpu_stress &
